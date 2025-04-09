@@ -1,8 +1,5 @@
 from wtpy.wrapper import WtDataHelper
-from wtpy.WtCoreDefs import WTSBarStruct, WTSTickStruct
-from ctypes import POINTER
-from wtpy.SessionMgr import SessionMgr
-import pandas as pd
+
 
 dataReader = WtDataHelper()
 
@@ -14,4 +11,4 @@ print(testdata.__data__, '\n伟大的分隔符')
 #print(testdata.ndarray)
 
 #不太了解每一列的意义，我们转换成csv格式查看。
-dataReader.dump_ticks("D:\\WorkingFiels\\pythonProject\\WonderTrader\\wtpy-dev\\demos\\storage\\bin\\ticks\\CFFEX.IF.HOT_tick_20210104.csv", testdata)
+dataReader.dump_ticks("D:\\WorkingFiels\\pythonProject\\WonderTrader\\wtpy-dev\\demos\\storage\\bin", )
