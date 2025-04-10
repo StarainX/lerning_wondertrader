@@ -25,4 +25,4 @@ ar = math.pow(ayNetVals.iloc[-1], annual_days/days) - 1
 
 ```
 
-然后这里其实还发现一个bug……敢情回测是资金为负还能继续回测？？？
+然应该是为了回测速度考虑所以没有加入判断逻辑。
