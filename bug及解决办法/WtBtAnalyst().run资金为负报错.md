@@ -25,4 +25,4 @@ ar = math.pow(ayNetVals.iloc[-1], annual_days/days) - 1
 
 ```
 
-然应该是为了回测速度考虑所以没有加入判断逻辑。
+猜测应该是为了回测速度考虑所以没有加入判断逻辑。
