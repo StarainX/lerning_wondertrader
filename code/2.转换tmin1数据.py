@@ -77,6 +77,8 @@ for each in file_list_old:
     df = df.drop(columns=['date'])
     df = df.drop(columns=['symbol'])
 
+
+    #这里有个小坑，9.0版本以后vol会被写入为0，0，把WTSBarStruct中的volume改为vol即可，应该是版本迭代留下的坑，数据实际最终还是写入到volume字段。
     df = df.rename(columns={
         'date_only': 'date',
         'time_only': 'time',
@@ -102,6 +104,8 @@ for each in file_list_old:
 
     def assign(procession, buffer):
         tuple(map(lambda x: setattr(buffer[x[0]], procession.name, x[1]), enumerate(procession)))
+
+
 
 
     df.apply(assign, buffer=buffer)

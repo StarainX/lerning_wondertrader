@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-  # 必须添加在文件第一行
+# -*- coding: utf-8 -*-
 import os
 import re
 import zipfile
@@ -12,20 +12,19 @@ init(autoreset=True)
 
 def print_banner():
     """打印艺术字横幅"""
-
     title = "★☆★ 楠哥哥的tick提取工具箱 ★☆★"
     author = "作者：Deepseek、吉哈德韦伯"
-    print(Fore.CYAN + "\n" + "="*60)
-    print(Fore.CYAN + f"{title:^60}")
-    print(Fore.CYAN + "="*60)
-    print(f"{author:>54}")  # 右对齐到58字符位置
+    print(Fore.CYAN + "\n" + "=" * 90)
+    print(Fore.CYAN + f"{title:^90}")
+    print(Fore.CYAN + "=" * 90)
+    print(f"{author:>88}")
     print()
 
 
 def extract_specific_contract(contract_name, root_dir, output_dir):
     """模式1：导出指定合约"""
     pattern = re.compile(rf"^{re.escape(contract_name)}\.csv$", re.IGNORECASE)
-    process_zips(root_dir, output_dir, pattern, contract_name)
+    process_zips(root_dir, output_dir, pattern)
 
 
 def extract_product_contracts(product_code, root_dir, output_dir):
@@ -34,11 +33,11 @@ def extract_product_contracts(product_code, root_dir, output_dir):
         rf"^{re.escape(product_code)}\d{{3,4}}\.csv$",
         re.IGNORECASE
     )
-    process_zips(root_dir, output_dir, pattern, product_code)
+    process_zips(root_dir, output_dir, pattern)
 
 
-def process_zips(root_dir, output_dir, pattern, target_name):
-    """通用处理函数（增强可视化）"""
+def process_zips(root_dir, output_dir, pattern):
+    """通用处理函数（按日期分目录存储）"""
     total_files = 0
     start_time = time.time()
 
@@ -48,34 +47,39 @@ def process_zips(root_dir, output_dir, pattern, target_name):
     for year in range(2011, 2026):
         year_dir = os.path.join(root_dir, str(year))
         if not os.path.exists(year_dir):
+            print(f"{Fore.YELLOW}⚠ 跳过不存在的年份目录：{year}")
             continue
 
         zip_files = sorted([f for f in os.listdir(year_dir) if f.endswith(".zip")])
-        print(f"\n{Fore.YELLOW}📅 正在处理 {year} 年数据（共 {len(zip_files)} 个交易日）")
+        print(f"\n{Fore.MAGENTA}📅 正在处理 {year} 年数据（共 {len(zip_files)} 个交易日）")
 
         for zip_file in tqdm(zip_files, desc=f"{Fore.BLUE}扫描进度", bar_format=bar_format):
             zip_path = os.path.join(year_dir, zip_file)
-            date_str = zip_file.split('.')[0]
+            date_str = os.path.splitext(zip_file)[0]  # 获取日期字符串
 
             try:
                 with zipfile.ZipFile(zip_path, 'r') as zf:
+                    # 创建日期子目录
+                    date_dir = os.path.join(output_dir, date_str)
+                    os.makedirs(date_dir, exist_ok=True)
+
                     matched = [f for f in zf.namelist() if pattern.match(f)]
 
                     if matched:
                         print(f"\n{Fore.GREEN}🔍 在 {zip_file} 中发现 {len(matched)} 个匹配：")
-                        for fname in matched:
-                            print(f"   {Fore.WHITE}→ {Fore.CYAN}{fname}")
 
                     for csv_file in matched:
-                        contract = csv_file.split('.')[0]
-                        new_name = f"{contract}_tick_{date_str}.csv"
+                        # 生成新文件名（保留原始合约文件名）
+                        new_name = os.path.basename(csv_file)
+                        dest_path = os.path.join(date_dir, new_name)
 
-                        zf.extract(csv_file, output_dir)
-                        os.rename(
-                            os.path.join(output_dir, csv_file),
-                            os.path.join(output_dir, new_name)
-                        )
-                        total_files += 1
+                        # 检查文件是否已存在
+                        if not os.path.exists(dest_path):
+                            zf.extract(csv_file, date_dir)
+                            print(f"   {Fore.WHITE}→ {Fore.CYAN}{new_name}")
+                            total_files += 1
+                        else:
+                            print(f"{Fore.YELLOW}⏩ 跳过已存在文件：{new_name}")
 
             except Exception as e:
                 print(f"\n{Fore.RED}⚠ 处理 {zip_file} 时出错：{str(e)}")
@@ -84,7 +88,7 @@ def process_zips(root_dir, output_dir, pattern, target_name):
     print(f"\n{Fore.GREEN}✅ 任务完成！共提取 {Fore.YELLOW}{total_files} {Fore.GREEN}个文件")
     print(f"{Fore.GREEN}🕒 耗时：{Fore.YELLOW}{time_cost:.2f}秒")
     print(f"{Fore.GREEN}📁 保存路径：{Fore.CYAN}{os.path.abspath(output_dir)}")
-    print("\n" + "★" * 60 + "\n")
+    print("\n" + "★" * 90 + "\n")
 
 
 def validate_product_code(input_str):
@@ -96,15 +100,15 @@ if __name__ == "__main__":
     os.system('cls' if os.name == 'nt' else 'clear')  # 清屏
     print_banner()
 
-    # 模式选择
+    # 操作说明
     print(f"{Fore.WHITE}📌 格式要求：")
-    print(f"1. 根目录结构示例：{Fore.CYAN}./根目录/2011/20210101.zip")
-    print(f"2. ZIP内文件命名：{Fore.CYAN}合约代码.csv（如：ag2405.csv）")
-    print(f"3. 输出目录建议使用空文件夹{Fore.RED}（已有文件可能被覆盖）\n")
+    print(f"1. 输出目录结构：{Fore.CYAN}输出目录/YYYYMMDD/合约文件.csv")
+    print(f"2. 自动跳过已存在的文件{Fore.YELLOW}（避免重复提取）\n")
 
+    # 模式选择
     print(f"{Fore.MAGENTA}🌸 请选择操作模式：")
-    print(f"{Fore.WHITE}1. {Fore.CYAN}精确合约提取（支持双字母+3/4位数字合约）")
-    print(f"{Fore.WHITE}2. {Fore.CYAN}全品种合约提取（支持双字母合约）\n")
+    print(f"{Fore.WHITE}1. {Fore.CYAN}精确合约提取（如 M2309）")
+    print(f"{Fore.WHITE}2. {Fore.CYAN}全品种合约提取（如 MA）\n")
 
     while True:
         mode = input(f"{Fore.YELLOW}➤ 请输入模式编号 (1/2): ").strip()
@@ -115,7 +119,7 @@ if __name__ == "__main__":
     # 路径处理
     print(f"\n{Fore.MAGENTA}📂 路径设置：")
     root_dir = input(f"{Fore.YELLOW}➤ 请输入原始数据根目录: ").strip()
-    output_dir = input(f"{Fore.YELLOW}➤ 请输入输出目录（默认：./data）: ").strip() or "data"
+    output_dir = input(f"{Fore.YELLOW}➤ 请输入输出目录（默认：./output）: ").strip() or "output"
     os.makedirs(output_dir, exist_ok=True)
 
     # 模式分支
@@ -138,4 +142,4 @@ if __name__ == "__main__":
         extract_product_contracts(product, root_dir, output_dir)
 
     # 结束提示
-    print(f"{Fore.GREEN}\n✨ 提示：可以使用Excel的【数据→从文件夹】功能批量分析提取的数据")
+    print(f"{Fore.GREEN}\n✨ 提示：每个交易日的合约文件存储在对应的日期目录中")
