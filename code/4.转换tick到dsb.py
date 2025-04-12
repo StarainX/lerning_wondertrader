@@ -7,14 +7,15 @@ import re
 # 需要提前设置好交易码代码
 exchg_name = 'CZCE'
 
-# 需要提取的文件路径，如果目录不存在，则抛出提示
+# 需要提取的文件路径
 root_directory = 'D:\\软件下载目录\\百度云\\期货test'  # 替换为实际路径
+# 需要转存到的路径根目录
+save_directory = 'D:\\WorkingFiels\\wtstudio\\data\\his\\tick\\CZCE'
+
+#目录不存在则抛出提示退出
 if not os.path.exists(root_directory):
     print(f"⚠ 输入路径不存在，请检查路径是否正确！")
     exit(1)
-
-# 需要转存到的路径根目录
-save_directory = 'D:\\WorkingFiels\\wtstudio\\data\\his\\tick\\CZCE'
 if not os.path.exists(save_directory):
     print(f"⚠ 输入路径不存在，请检查路径是否正确！")
     exit(1)
@@ -144,8 +145,10 @@ for each in csv_list:
 
 
     def assign(procession, buffer):
-        tuple(map(lambda x: setattr(buffer[x[0]], procession.name, x[1]), enumerate(procession)))
-
+        try :
+            tuple(map(lambda x: setattr(buffer[x[0]], procession.name, x[1]), enumerate(procession)))
+        except:
+            print()
 
     df.apply(assign, buffer=buffer)
     # print(df)
