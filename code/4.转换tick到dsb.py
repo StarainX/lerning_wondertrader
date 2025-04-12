@@ -1,3 +1,5 @@
+#  该文件在转换时候会先判断原位置有没有文件，有则会跳过，避免重复转换。
+
 from wtpy.wrapper import WtDataHelper
 from wtpy.WtCoreDefs import WTSTickStruct
 import pandas as pd
@@ -12,13 +14,14 @@ root_directory = 'D:\\软件下载目录\\百度云\\期货test'  # 替换为实
 # 需要转存到的路径根目录
 save_directory = 'D:\\WorkingFiels\\wtstudio\\data\\his\\tick\\CZCE'
 
-#目录不存在则抛出提示退出
+# 目录不存在则抛出提示退出
 if not os.path.exists(root_directory):
     print(f"⚠ 输入路径不存在，请检查路径是否正确！")
     exit(1)
 if not os.path.exists(save_directory):
     print(f"⚠ 输入路径不存在，请检查路径是否正确！")
     exit(1)
+
 
 def collect_csv_paths(root_dir):
     csv_files = []
@@ -64,17 +67,70 @@ def split_alpha_numeric(s):
 # result = split_file_path(mixed_path)
 # print(result)  # 输出：['mixed', 'separators', '', 'and', 'slashes']
 
-dtHelper = WtDataHelper()
 
-# 取出文件路径方便后面使用
 csv_list = collect_csv_paths(root_directory)
 
-# 取出文件名方便后面使用
+# 借助csv_list取出csv_list中的文件名，并删除其中的.csv后缀,实际上生成所有合约名。
+# 这样所有路径变量都基于csv_list，方便修改逻辑。
+
+# 判断csv_list中的文件是否存在，如果存在则删除csv_list中的对应记录，只保留不存在的文件记录。
+# 这样就可以跳过已存在的文件了。
+
+import os
+
+# 假设 split_file_path 和 split_alpha_numeric 函数已正确实现
+
+# 打印处理前的信息
+print(f"需要转换的文件数例: {len(csv_list)}")
+if len(csv_list) > 0:
+    print(f"原首文件: {csv_list[0]}")
+    print(f"原尾文件: {csv_list[-1]}")
+
+# 使用列表推导式过滤需要保留的条目
+# 这里原先在遍历时候直接从原列表remove，导致索引错位。正常做法是构建新列表，不能直接在循环中对原列表进行修改。
+filtered_list = []
+for each in csv_list:
+    # 使用 os.path 处理路径
+    dir_path = os.path.dirname(each)
+    file_name = os.path.basename(each)
+    base_name = os.path.splitext(file_name)[0]  # 安全去除扩展名
+
+    # 获取路径最后组成部分
+    path_elements = split_file_path(dir_path)
+    dir_last_part = path_elements[-1] if path_elements else ''
+
+    # 分割文件名中的字母和数字
+    name_part, num_part = split_alpha_numeric(base_name)
+    if not name_part:
+        name_part = "unknown"
+    if not num_part:
+        num_part = "000"
+
+    # 构建新路径
+    new_dir = os.path.join(save_directory, dir_last_part)
+    new_filename = f"{exchg_name}.{name_part}.{num_part}_tick_{dir_last_part}.dsb"
+    new_filepath = os.path.join(new_dir, new_filename)
+
+    # 仅保留未生成最终文件的条目
+    if not os.path.exists(new_filepath):
+        filtered_list.append(each)
+
+csv_list = filtered_list
+
+# 打印处理后的信息
+print(f"剔除已存在文件后需要转换的文件数量: {len(csv_list)}")
+if len(csv_list) > 0:
+    print(f"新首文件: {csv_list[0]}")
+    print(f"新尾文件: {csv_list[-1]}")
+print(csv_list)
+
+
 csv_name = [
     os.path.splitext(os.path.basename(file_path))[0]
     for file_path in csv_list]
 
-# print(len(csv_list), len(csv_name))
+#breakpoint()
+dtHelper = WtDataHelper()
 
 s = 0
 for each in csv_list:
@@ -86,7 +142,7 @@ for each in csv_list:
     # 这里有个小坑，9.0版本以后vol会被写入为0，0，把WTSBarStruct中的volume改为vol即可，应该是版本迭代留下的坑，数据实际最终还是写入到volume字段。
     # 先重命名所有可用的现存列
     df = df.rename(columns={
-        #'InstrumentID': 'code',  # 合约代码
+        # 'InstrumentID': 'code',  # 合约代码
         'TradingDay': 'trading_date',
         'LastPrice': 'price',  # 最新价
         'Volume': 'total_volume',  # 总成交量
@@ -97,8 +153,6 @@ for each in csv_list:
         'Turnover': 'total_turnover',  # 总成交额
         'OpenInterest': 'open_interest',  # 持仓量
     })
-
-
 
     # 增加几列需要运算得出的字段
     # 不知道为啥这里要二进制形式的
@@ -145,10 +199,9 @@ for each in csv_list:
 
 
     def assign(procession, buffer):
-        try :
-            tuple(map(lambda x: setattr(buffer[x[0]], procession.name, x[1]), enumerate(procession)))
-        except:
-            print()
+        tuple(map(lambda x: setattr(buffer[x[0]], procession.name, x[1]), enumerate(procession)))
+
+
 
     df.apply(assign, buffer=buffer)
     # print(df)
@@ -177,10 +230,10 @@ for each in csv_list:
     if not os.path.exists(newfilename):
         # 调用store_ticks方法转换成dsb格式文件，注意目录存在才会写入，且不能有中文名，不会报错。
         dtHelper.store_ticks(tickFile=newfilename, firstTick=buffer, count=len(df))
+        print(newfilename + '转换完毕')
     else:
         print(f"{newfilename}已存在，跳过。")
 
     s += 1
-    print(newfilename + '转换完毕')
     # if s == 1:
     #     break
