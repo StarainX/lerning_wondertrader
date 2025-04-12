@@ -7,12 +7,17 @@ import re
 # 需要提前设置好交易码代码
 exchg_name = 'CZCE'
 
-# 需要提取的文件路径
-root_directory = 'D:\\软件下载目录\\百度云\\test'  # 替换为实际路径
+# 需要提取的文件路径，如果目录不存在，则抛出提示
+root_directory = 'D:\\软件下载目录\\百度云\\期货test'  # 替换为实际路径
+if not os.path.exists(root_directory):
+    print(f"⚠ 输入路径不存在，请检查路径是否正确！")
+    exit(1)
 
-#需要转存到的路径根目录
+# 需要转存到的路径根目录
 save_directory = 'D:\\WorkingFiels\\wtstudio\\data\\his\\tick\\CZCE'
-
+if not os.path.exists(save_directory):
+    print(f"⚠ 输入路径不存在，请检查路径是否正确！")
+    exit(1)
 
 def collect_csv_paths(root_dir):
     csv_files = []
@@ -58,6 +63,7 @@ def split_alpha_numeric(s):
 # result = split_file_path(mixed_path)
 # print(result)  # 输出：['mixed', 'separators', '', 'and', 'slashes']
 
+dtHelper = WtDataHelper()
 
 # 取出文件路径方便后面使用
 csv_list = collect_csv_paths(root_directory)
@@ -69,7 +75,6 @@ csv_name = [
 
 # print(len(csv_list), len(csv_name))
 
-dtHelper = WtDataHelper()
 s = 0
 for each in csv_list:
     with open(each) as f:
@@ -80,7 +85,7 @@ for each in csv_list:
     # 这里有个小坑，9.0版本以后vol会被写入为0，0，把WTSBarStruct中的volume改为vol即可，应该是版本迭代留下的坑，数据实际最终还是写入到volume字段。
     # 先重命名所有可用的现存列
     df = df.rename(columns={
-        'InstrumentID': 'code',  # 合约代码
+        #'InstrumentID': 'code',  # 合约代码
         'TradingDay': 'trading_date',
         'LastPrice': 'price',  # 最新价
         'Volume': 'total_volume',  # 总成交量
@@ -91,6 +96,8 @@ for each in csv_list:
         'Turnover': 'total_turnover',  # 总成交额
         'OpenInterest': 'open_interest',  # 持仓量
     })
+
+
 
     # 增加几列需要运算得出的字段
     # 不知道为啥这里要二进制形式的
@@ -149,25 +156,28 @@ for each in csv_list:
     # 整理重命名规则，类似CFFEX.IF.HOT_tick_20210104
     file_path = os.path.dirname(csv_list[s])
     file_path_elements = split_file_path(file_path)
-    name,number= split_alpha_numeric(csv_name[s])
+    name, number = split_alpha_numeric(csv_name[s])
 
-    newfilename = save_directory + '\\'+file_path_elements[-1]+'\\' + exchg_name + '.' +name+'.'+number+ '_tick_' + file_path_elements[-1] + '.dsb'
+    newfilename = save_directory + '\\' + file_path_elements[
+        -1] + '\\' + exchg_name + '.' + name + '.' + number + '_tick_' + file_path_elements[-1] + '.dsb'
 
-    #df.to_csv(newfilename+'.csv',index=False)
+    # df.to_csv(newfilename+'.csv',index=False)
 
-
-    #判断目录是否存在，不存在则创建
-    write_dir = save_directory + '\\'+file_path_elements[-1]
+    # 判断目录是否存在，不存在则创建
+    write_dir = save_directory + '\\' + file_path_elements[-1]
     if not os.path.exists(write_dir):
         # 如果目录不存在，则创建目录
         os.makedirs(write_dir)
         print(f"目录 {write_dir}不存在，已创建")
 
-
-    #调用store_ticks方法转换成dsb格式文件，注意目录存在才会写入，且不能有中文名，不会报错。
-    dtHelper.store_ticks(tickFile=newfilename, firstTick=buffer, count=len(df))
+    # 判断newfilename是否存在，存在则跳过，不存在则调用dtHelper.store_ticks写入
+    if not os.path.exists(newfilename):
+        # 调用store_ticks方法转换成dsb格式文件，注意目录存在才会写入，且不能有中文名，不会报错。
+        dtHelper.store_ticks(tickFile=newfilename, firstTick=buffer, count=len(df))
+    else:
+        print(f"{newfilename}已存在，跳过。")
 
     s += 1
-    print(newfilename+'转换完毕')
+    print(newfilename + '转换完毕')
     # if s == 1:
     #     break
