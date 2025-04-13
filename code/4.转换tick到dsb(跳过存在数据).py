@@ -1,4 +1,5 @@
-#  该文件在转换时候会先判断原位置有没有文件，有则会跳过，避免重复转换。
+#  这是一个将csv格式tick数据转换为自定义的dsb压缩格式的脚步。
+#  tick数据量大，转换生成比较耗时，所以会先判断原位置有没有文件，有则会跳过，避免重复转换。
 
 from wtpy.wrapper import WtDataHelper
 from wtpy.WtCoreDefs import WTSTickStruct
@@ -6,9 +7,9 @@ import pandas as pd
 import os
 import re
 
+
 # 需要提前设置好交易码代码
 exchg_name = 'CZCE'
-
 # 需要提取的文件路径
 root_directory = 'D:\\软件下载目录\\百度云\\期货test'  # 替换为实际路径
 # 需要转存到的路径根目录
@@ -54,37 +55,14 @@ def split_alpha_numeric(s):
         return None, None
 
 
-# 示例用法
-# file_path = "/home/user/documents/file.txt"
-# result = split_file_path(file_path)
-# print(result)  # 输出：['', 'home', 'user', 'documents', 'file.txt']
-#
-# windows_path = "C:\\Program Files\\Python\\python.exe"
-# result = split_file_path(windows_path)
-# print(result)  # 输出：['C:', 'Program Files', 'Python', 'python.exe']
-#
-# mixed_path = "mixed\\separators//and/slashes"
-# result = split_file_path(mixed_path)
-# print(result)  # 输出：['mixed', 'separators', '', 'and', 'slashes']
-
-
 csv_list = collect_csv_paths(root_directory)
 
-# 借助csv_list取出csv_list中的文件名，并删除其中的.csv后缀,实际上生成所有合约名。
-# 这样所有路径变量都基于csv_list，方便修改逻辑。
-
-# 判断csv_list中的文件是否存在，如果存在则删除csv_list中的对应记录，只保留不存在的文件记录。
-# 这样就可以跳过已存在的文件了。
-
-import os
-
-# 假设 split_file_path 和 split_alpha_numeric 函数已正确实现
 
 # 打印处理前的信息
-print(f"需要转换的文件数例: {len(csv_list)}")
+print(f"压缩档案内总共需要转换的文件数例: {len(csv_list)}")
 if len(csv_list) > 0:
-    print(f"原首文件: {csv_list[0]}")
-    print(f"原尾文件: {csv_list[-1]}")
+    print(f"开始文件: {csv_list[0]}")
+    print(f"结束文件: {csv_list[-1]}")
 
 # 使用列表推导式过滤需要保留的条目
 # 这里原先在遍历时候直接从原列表remove，导致索引错位。正常做法是构建新列表，不能直接在循环中对原列表进行修改。
@@ -111,7 +89,7 @@ for each in csv_list:
     new_filename = f"{exchg_name}.{name_part}.{num_part}_tick_{dir_last_part}.dsb"
     new_filepath = os.path.join(new_dir, new_filename)
 
-    # 仅保留未生成最终文件的条目
+    # 仅保留没有生成最终文件的条目
     if not os.path.exists(new_filepath):
         filtered_list.append(each)
 
@@ -120,11 +98,11 @@ csv_list = filtered_list
 # 打印处理后的信息
 print(f"剔除已存在文件后需要转换的文件数量: {len(csv_list)}")
 if len(csv_list) > 0:
-    print(f"新首文件: {csv_list[0]}")
-    print(f"新尾文件: {csv_list[-1]}")
+    print(f"开始文件: {csv_list[0]}")
+    print(f"结束文件: {csv_list[-1]}")
 print(csv_list)
 
-
+# 从csv_list中取出文件名，并删除其中的.csv后缀,实际上生成所有合约名。
 csv_name = [
     os.path.splitext(os.path.basename(file_path))[0]
     for file_path in csv_list]
@@ -187,6 +165,13 @@ for each in csv_list:
         'UpdateTime'].dt.second) * 1000 + df['UpdateMillisec']
 
     # print(df['action_time'])
+
+    # 这三个字段看看能不能从akshare日k上拉一下。不过就算只拿单个合约的日线，合约还是很多，一次查询太多会被封号。
+    # 解决方法是获取上一个交易日文件夹内同名合约的最后一条数据中的收盘和持仓
+    # "pre_close",
+    # "pre_settle",
+    # "pre_interest",
+
 
     df = df[
         ['exchg', 'code', 'price', 'open', 'high', 'low', 'total_volume', 'total_volume', 'volume', 'total_turnover',
