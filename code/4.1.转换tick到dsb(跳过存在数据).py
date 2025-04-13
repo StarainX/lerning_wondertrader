@@ -7,20 +7,19 @@ import pandas as pd
 import os
 import re
 
-
 # 需要提前设置好交易码代码
 exchg_name = 'CZCE'
 # 需要提取的文件路径
 root_directory = 'D:\\软件下载目录\\百度云\\期货test'  # 替换为实际路径
 # 需要转存到的路径根目录
-save_directory = 'D:\\WorkingFiels\\wtstudio\\data\\his\\tick\\CZCE'
+save_directory = 'D:\\WorkingFiels\\wtstudio\\data\\his\\ticks\\CZCE'
 
 # 目录不存在则抛出提示退出
 if not os.path.exists(root_directory):
     print(f"⚠ 输入路径不存在，请检查路径是否正确！")
     exit(1)
 if not os.path.exists(save_directory):
-    print(f"⚠ 输入路径不存在，请检查路径是否正确！")
+    print(f"⚠ 输出路径不存在，请检查路径是否正确！")
     exit(1)
 
 
@@ -57,7 +56,6 @@ def split_alpha_numeric(s):
 
 csv_list = collect_csv_paths(root_directory)
 
-
 # 打印处理前的信息
 print(f"压缩档案内总共需要转换的文件数例: {len(csv_list)}")
 if len(csv_list) > 0:
@@ -86,12 +84,17 @@ for each in csv_list:
 
     # 构建新路径
     new_dir = os.path.join(save_directory, dir_last_part)
-    new_filename = f"{exchg_name}.{name_part}.{num_part}_tick_{dir_last_part}.dsb"
+    new_filename = f"{name_part}{num_part}.dsb"
     new_filepath = os.path.join(new_dir, new_filename)
+
+    #print(new_filepath)
 
     # 仅保留没有生成最终文件的条目
     if not os.path.exists(new_filepath):
         filtered_list.append(each)
+
+
+
 
 csv_list = filtered_list
 
@@ -100,14 +103,18 @@ print(f"剔除已存在文件后需要转换的文件数量: {len(csv_list)}")
 if len(csv_list) > 0:
     print(f"开始文件: {csv_list[0]}")
     print(f"结束文件: {csv_list[-1]}")
-print(csv_list)
+
+
+#print(csv_list)
+
+
 
 # 从csv_list中取出文件名，并删除其中的.csv后缀,实际上生成所有合约名。
 csv_name = [
     os.path.splitext(os.path.basename(file_path))[0]
     for file_path in csv_list]
 
-#breakpoint()
+# breakpoint()
 dtHelper = WtDataHelper()
 
 s = 0
@@ -155,7 +162,6 @@ for each in csv_list:
     df['high'] = df['price'].max()  # 最高价
     df['low'] = df['price'].min()  # 最低价
     # df['settle_price'] = df['settle_price']# 不知道结算价怎么算的，不搞了。
-    df['action_date'] = df['trading_date']
 
     # 将UpdateTime列转换为时间戳格式
     df['UpdateTime'] = pd.to_datetime(df['UpdateTime'], format='%H:%M:%S')
@@ -163,6 +169,10 @@ for each in csv_list:
     # 这里虽然加上了UpdateMillisec，实际上源数据库都是0……
     df['action_time'] = (df['UpdateTime'].dt.hour * 10000 + df['UpdateTime'].dt.minute * 100 + df[
         'UpdateTime'].dt.second) * 1000 + df['UpdateMillisec']
+    # 这三个数据的类型在WTSTickStruct中规定必须为int。
+    df['action_date'] = df['trading_date'].astype(int)
+    df['UpdateTime']=df['UpdateTime'].astype(int)
+    df['action_time']=df['action_time'].astype(int)
 
     # print(df['action_time'])
 
@@ -171,7 +181,6 @@ for each in csv_list:
     # "pre_close",
     # "pre_settle",
     # "pre_interest",
-
 
     df = df[
         ['exchg', 'code', 'price', 'open', 'high', 'low', 'total_volume', 'total_volume', 'volume', 'total_turnover',
@@ -187,7 +196,6 @@ for each in csv_list:
         tuple(map(lambda x: setattr(buffer[x[0]], procession.name, x[1]), enumerate(procession)))
 
 
-
     df.apply(assign, buffer=buffer)
     # print(df)
     # print(buffer[s].to_dict())
@@ -199,8 +207,12 @@ for each in csv_list:
     file_path_elements = split_file_path(file_path)
     name, number = split_alpha_numeric(csv_name[s])
 
+    # 被坑了，别按bin目录下的格式来。tick文件放在交易所/日期/合约字母+合约名.dsb就行！
+    # newfilename = save_directory + '\\' + file_path_elements[
+    #     -1] + '\\' + exchg_name + '.' + name + '.' + number + '_tick_' + file_path_elements[-1] + '.dsb'
+
     newfilename = save_directory + '\\' + file_path_elements[
-        -1] + '\\' + exchg_name + '.' + name + '.' + number + '_tick_' + file_path_elements[-1] + '.dsb'
+        -1] + '\\' + name + number + '.dsb'
 
     # df.to_csv(newfilename+'.csv',index=False)
 
