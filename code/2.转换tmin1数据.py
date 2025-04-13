@@ -6,6 +6,8 @@
 
 # 品种和合约信息可以从commodities.json和contracts.json拉取。
 
+#这部分决定弃用了，因为1min和tick不是一个地方买的，正常的话应该从tick来生成多周期数据。
+
 
 #
 from wtpy.wrapper import WtDataHelper
