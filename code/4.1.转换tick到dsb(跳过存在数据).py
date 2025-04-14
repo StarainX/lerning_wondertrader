@@ -9,10 +9,15 @@ import re
 
 # 需要提前设置好交易码代码
 exchg_name = 'CZCE'
-# 需要提取的文件路径
-root_directory = 'D:\\软件下载目录\\百度云\\期货test'  # 替换为实际路径
+#exchg_name = 'DCE'
+#exchg_name = 'SHFE'
+#exchg_name = 'INE'
+#exchg_name = 'CFFEX'
+#exchg_name = 'GFEX'
+# 需要转换的原文件路径
+root_directory = 'D:\\软件下载目录\\百度云\\sa'  # 替换为实际路径
 # 需要转存到的路径根目录
-save_directory = 'D:\\WorkingFiels\\wtstudio\\data\\his\\ticks\\CZCE'
+save_directory = 'D:\\WorkingFiels\\wtstudio\\data\\his\\ticks\\'+exchg_name
 
 # 目录不存在则抛出提示退出
 if not os.path.exists(root_directory):
