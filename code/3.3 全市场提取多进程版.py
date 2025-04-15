@@ -8,7 +8,6 @@ import ctypes
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
 from colorama import Fore, Style, init
-from functools import partial
 from itertools import islice
 
 # 初始化颜色支持（Windows需要）
@@ -229,7 +228,7 @@ if __name__ == "__main__":
 
     # 操作说明
     print(f"{Fore.WHITE}📌 格式要求：")
-    print(f"1. 源档案目录结构：{Fore.CYAN}根目录/2014/合约文件.zip")
+    print(f"1. 源档案目录结构：{Fore.CYAN}根目录/2014/YYYYMMDD.zip")
     print(f"2. 自动跳过已存在的文件{Fore.YELLOW}（避免重复提取）\n")
 
     # 模式选择
