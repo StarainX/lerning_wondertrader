@@ -10,22 +10,21 @@ import re
 
 # 需要提前设置好交易码代码
 exchg_name = 'CZCE'
-#exchg_name = 'DCE'
-#exchg_name = 'SHFE'
-#exchg_name = 'INE'
-#exchg_name = 'CFFEX'
-#exchg_name = 'GFEX'
+# exchg_name = 'DCE'
+# exchg_name = 'SHFE'
+# exchg_name = 'INE'
+# exchg_name = 'CFFEX'
+# exchg_name = 'GFEX'
 # 需要转换的原文件路径
 root_directory = 'D:\\软件下载目录\\百度云\\fg'  # 替换为实际路径
 # 需要转存到的路径根目录
-save_directory = 'D:\\WorkingFiels\\wtstudio\\data\\his\\ticks\\'+exchg_name
+save_directory = 'D:\\WorkingFiels\\wtstudio\\data\\his\\ticks\\' + exchg_name
 
 pd.set_option('display.max_rows', None)  # 显示所有行
 pd.set_option('display.max_columns', None)  # 显示所有列
 pd.set_option('display.width', None)  # 调整宽度以适应所有列
 
-
-#一个数据填充规则。
+# 一个数据填充规则。
 
 
 # 目录不存在则抛出提示退出
@@ -67,7 +66,11 @@ def split_alpha_numeric(s):
     else:
         return None, None
 
+
 csv_list = collect_csv_paths(root_directory)
+
+# 从csv_files中收集所有文件名的上一级目录目录，由于上一级目录名是交易日日期，实际就形成了交易日列表。
+trading_days = sorted({os.path.basename(os.path.dirname(p)) for p in csv_list})
 
 # 打印处理前的信息
 print(f"压缩档案内总共需要转换的文件数例: {len(csv_list)}")
@@ -100,14 +103,11 @@ for each in csv_list:
     new_filename = f"{name_part}{num_part}.dsb"
     new_filepath = os.path.join(new_dir, new_filename)
 
-    #print(new_filepath)
+    # print(new_filepath)
 
     # 仅保留没有生成最终文件的条目
     if not os.path.exists(new_filepath):
         filtered_list.append(each)
-
-
-
 
 csv_list = filtered_list
 
@@ -117,9 +117,7 @@ if len(csv_list) > 0:
     print(f"开始文件: {csv_list[0]}")
     print(f"结束文件: {csv_list[-1]}")
 
-
-#print(csv_list)
-
+# print(csv_list)
 
 
 # 从csv_list中取出文件名，并删除其中的.csv后缀,实际上生成所有合约名。
@@ -127,7 +125,6 @@ csv_name = [
     os.path.splitext(os.path.basename(file_path))[0]
     for file_path in csv_list]
 
-# breakpoint()
 dtHelper = WtDataHelper()
 
 s = 0
@@ -136,22 +133,20 @@ for each in csv_list:
         encode = f.encoding
     df = pd.read_csv(each, encoding=encode)
 
-
-    #找到第一个且最后一个UpdateTime为20:59:00的数据，删除这行之前的所有数据。
-    #清洗
-    df=ql.QuantBox.dayAndnight(df)
+    # 找到第一个且最后一个UpdateTime为20:59:00的数据，删除这行之前的所有数据。
+    # 清洗
+    df = ql.QuantBox.dayAndnight(df)
     # 用往后最近的LastPrice和AveragePric向前填充NaN
     # 使用 bfill 方法向前填充空值
     df['LastPrice'] = df['LastPrice'].bfill()
     df['AveragePrice'] = df['AveragePrice'].bfill()
-    df=ql.QuantBox.plus_ms(df)
+    df = ql.QuantBox.plus_ms(df)
 
-    #去除8:59之前和20：59之前的多余数据。
+    # 去除8:59之前和20：59之前的多余数据。
 
     # 检测时间列是否存在20:59，如果存在，判断为有夜盘，遍历夜盘时间段的数据，修改为上一个交易日。这里需要一个包含日期文件夹的list。
     # 可能记录两条8:59，所以需要判断当前列时间=8:59:00且下一列数据大于9:00:00。
     # 1. 定位第一个且最后一个时间为8:59:00的数据
-
 
     # 这里有个小坑，9.0版本以后vol会被写入为0，0，把WTSBarStruct中的volume改为vol即可，应该是版本迭代留下的坑，数据实际最终还是写入到volume字段。
     # 先重命名所有可用的现存列
@@ -168,23 +163,36 @@ for each in csv_list:
         'OpenInterest': 'open_interest',  # 持仓量
     })
 
-    # 增加几列需要运算得出的字段
-    # 不知道为啥这里要二进制形式的
-    df['exchg'] = b'CZCE'  # 交易所代码
+    ## 填充一下没屌用的pre字段。需要通过当前文件名进行日期向前偏移来获取最后一条数据赋值
+    # 计算当前日期
+    current_date = split_file_path(each)[-2] if len(split_file_path(each)) >= 2 else None
+    current_contract = split_file_path(each)[-1] if len(split_file_path(each)) >= 1 else None
+    # 获取上一个文件夹内该合约的最后一条数据。
+    # 获取current_date在trading_days中的位置，获取前一个日期。
+    if current_date in trading_days:
+        index = trading_days.index(current_date)
+        if index > 0:
+            previous_date = trading_days[index - 1]
+
+            # 获取上个交易日的收盘和持仓数据
+            df_yestraday = pd.read_csv(root_directory + '\\' + current_date + '\\' + current_contract, encoding=encode)
+
+            df['pre_close'] = df_yestraday.iloc[-1]['LastPrice']
+            df['pre_interest'] = df_yestraday.iloc[-1]['OpenInterest']
+
+    # 交易所名以二进制保存
+    df['exchg'] = bytes(f'{exchg_name}', encoding='utf-8')  # 交易所代码
+    # code是合约名
     df['code'] = csv_name[s].encode('utf-8')
-
-    #计算成交方向，线写入reserve字段。
-
-    # 去掉开盘前的空值
 
     # 使用diff()有个问题，就是第一个值是NaN不会被赋值。
     # 其实集合竞价也有成交量、成交额、仓差的变化，不过会在开盘前一分钟统一绘制。开盘时开始计算差额。
     # 计算每tick成交量
-    df['volume'] = df['total_volume'].diff()
+    df['volume'] = df['total_volume'].diff().fillna(0)
     # 计算每tick成交额
-    df['turn_over'] = df['total_turnover'].diff()
+    df['turn_over'] = df['total_turnover'].diff().fillna(0)
     # 计算仓差，
-    df['diff_interest'] = df['open_interest'].diff()
+    df['diff_interest'] = df['open_interest'].diff().fillna(0)
 
     # 计算开盘价
     # 第1个元素f['price'][0]是开机时间只有持仓时间没有其他
@@ -202,8 +210,8 @@ for each in csv_list:
         'UpdateTime'].dt.second) * 1000 + df['UpdateMillisec']
     # 这三个数据的类型在WTSTickStruct中规定必须为int。
     df['action_date'] = df['trading_date'].astype(int)
-    df['UpdateTime']=df['UpdateTime'].astype(int)
-    df['action_time']=df['action_time'].astype(int)
+    df['UpdateTime'] = df['UpdateTime'].astype(int)
+    df['action_time'] = df['action_time'].astype(int)
 
     # print(df['action_time'])
 
@@ -215,9 +223,13 @@ for each in csv_list:
 
     df = df[
         ['exchg', 'code', 'price', 'open', 'high', 'low', 'total_volume', 'total_volume', 'volume', 'total_turnover',
-         'turn_over', 'open_interest', 'diff_interest', 'trading_date', 'action_date', 'action_time', 'bid_price_0',
+         'turn_over', 'open_interest', 'diff_interest', 'trading_date', 'action_date', 'action_time', 'pre_close',
+         'pre_interest', 'bid_price_0',
          'bid_qty_0',
          'ask_price_0', 'ask_qty_0']]
+
+    print(df)
+    breakpoint()
 
     BUFFER = WTSTickStruct * len(df)
     buffer = BUFFER()
