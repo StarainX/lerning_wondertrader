@@ -1,3 +1,4 @@
+#
 from concurrent.futures import ProcessPoolExecutor
 from wtpy.wrapper import WtDataHelper
 from wtpy.WtCoreDefs import WTSTickStruct
@@ -14,14 +15,15 @@ import logging
 logging.basicConfig(
     filename='conversion.log',
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    encoding='utf-8'
 )
 
 
 @dataclass
 class PathConfig:
     exchg_name: str = 'CZCE'
-    root_dir: str = 'D:\\软件下载目录\\百度云\\ma'
+    root_dir: str = 'D:\\软件下载目录\\百度云\\sa'
     save_root: str = 'D:\\WorkingFiels\\wtstudio\\data\\his\\ticks'
 
     @property
@@ -46,6 +48,15 @@ def validate_paths():
 
 
 def collect_csv_paths(root_dir: str) -> list:
+    """收集CSV文件路径"""
+    return [
+        os.path.join(root, file)
+        for root, _, files in os.walk(root_dir)
+        for file in files
+        if file.lower().endswith('.csv')
+    ]
+
+def collect_csv_dates(root_dir: str) -> list:
     """收集CSV文件路径"""
     return [
         os.path.join(root, file)
@@ -190,7 +201,7 @@ def main():
         return
 
     # 修改为进程池
-    with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:  # 自动设置核心数
+    with ProcessPoolExecutor(max_workers= os.cpu_count()-10) as executor:  # 自动设置核心数
         list(tqdm(
             executor.map(process_file, csv_files),
             total=len(csv_files),
