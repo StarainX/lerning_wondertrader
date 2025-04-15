@@ -1,13 +1,14 @@
+from concurrent.futures import ProcessPoolExecutor
 from wtpy.wrapper import WtDataHelper
 from wtpy.WtCoreDefs import WTSTickStruct
+from dataclasses import dataclass
+from tqdm import tqdm
 import quantlib as ql
 import pandas as pd
 import os
 import re
-from concurrent.futures import ThreadPoolExecutor
-from tqdm import tqdm
 import logging
-from dataclasses import dataclass
+
 
 # 配置日志记录
 logging.basicConfig(
@@ -20,7 +21,7 @@ logging.basicConfig(
 @dataclass
 class PathConfig:
     exchg_name: str = 'CZCE'
-    root_dir: str = 'D:\\软件下载目录\\百度云\\fg'
+    root_dir: str = 'D:\\软件下载目录\\百度云\\ma'
     save_root: str = 'D:\\WorkingFiels\\wtstudio\\data\\his\\ticks'
 
     @property
@@ -30,10 +31,10 @@ class PathConfig:
 
 cfg = PathConfig()
 
-# 初始化显示配置
-pd.set_option('display.max_rows', None)
-pd.set_option('display.max_columns', None)
-pd.set_option('display.width', None)
+# # 初始化显示配置
+# pd.set_option('display.max_rows', None)
+# pd.set_option('display.max_columns', None)
+# pd.set_option('display.width', None)
 
 
 def validate_paths():
@@ -178,7 +179,6 @@ def process_file(file_path: str):
         raise
 
 
-from concurrent.futures import ProcessPoolExecutor  # 替换导入
 
 def main():
     validate_paths()
