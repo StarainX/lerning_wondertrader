@@ -271,7 +271,7 @@ if __name__ == "__main__":
 
     elif mode == "3":
         print(f"\n{Fore.MAGENTA}🚀 全市场一键提取模式：")
-        default_procs = multiprocessing.cpu_count()
+        default_procs = multiprocessing.cpu_count()*2
         while True:
             procs_input = input(f"{Fore.YELLOW}➤ 请输入使用的进程数（默认{default_procs}）: ").strip()
             if not procs_input:
