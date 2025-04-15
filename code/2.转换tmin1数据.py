@@ -6,7 +6,7 @@
 
 # 品种和合约信息可以从commodities.json和contracts.json拉取。
 
-#这部分决定弃用了，因为1min和tick不是一个地方买的，正常的话应该从tick来生成多周期数据。
+# 这部分决定弃用了，因为1min和tick不是一个地方买的，正常的话应该从tick来生成多周期数据。
 
 
 #
@@ -17,11 +17,13 @@ import os
 import re
 
 # 这是从commodities.json中提取处理过的wondertrader的品种名称
-json_data = {'CFFEX': {'IC', 'IF', 'IH', 'IM', 'T', 'TF', 'TL', 'TS','LC','SI'},
+json_data = {'CFFEX': {'IC', 'IF', 'IH', 'IM', 'T', 'TF', 'TL', 'TS', 'LC', 'SI'},
              'CZCE': {'AP', 'CF', 'CJ', 'CY', 'FG', 'JR', 'LR', 'MA', 'OI', 'PF', 'PK', 'PM', 'PX', 'RI', 'RM', 'RS',
-                      'SA', 'SF', 'SH', 'SM', 'SR', 'TA', 'UR', 'WH', 'WT','ZC'},
+                      'SA', 'SF', 'SH', 'SM', 'SR', 'TA', 'UR', 'WH', 'WT', 'ZC'},
              'DCE': {'a', 'b', 'bb', 'c', 'cs', 'eb', 'eg', 'fb', 'i', 'j', 'jd', 'jm', 'l', 'lh', 'm', 'p', 'pg', 'pp',
-                     'rr', 'v', 'y'}, 'GFEX': {'lc', 'si'}, 'INE': {'bc', 'ec', 'lu', 'nr', 'sc'},
+                     'rr', 'v', 'y'},
+             'GFEX': {'lc', 'si'},
+             'INE': {'bc', 'ec', 'lu', 'nr', 'sc'},
              'SHFE': {'ag', 'al', 'ao', 'au', 'br', 'bu', 'cu', 'fu', 'hc', 'ni', 'pb', 'rb', 'ru', 'sn', 'sp', 'ss',
                       'wr', 'zn'}}
 
@@ -79,8 +81,7 @@ for each in file_list_old:
     df = df.drop(columns=['date'])
     df = df.drop(columns=['symbol'])
 
-
-    #这里有个小坑，9.0版本以后vol会被写入为0，0，把WTSBarStruct中的volume改为vol即可，应该是版本迭代留下的坑，数据实际最终还是写入到volume字段。
+    # 这里有个小坑，9.0版本以后vol会被写入为0，0，把WTSBarStruct中的volume改为vol即可，应该是版本迭代留下的坑，数据实际最终还是写入到volume字段。
     df = df.rename(columns={
         'date_only': 'date',
         'time_only': 'time',
@@ -95,36 +96,30 @@ for each in file_list_old:
     df['date'] = df['date'].astype('datetime64[ns]').dt.strftime('%Y%m%d').astype('int64')
     df['time'] = df['time'].astype(str)
 
-
-
-    #print(df['time'])
-    df['time'] = (df['date']-19900000)*10000 + df['time'].str.replace(':', '').str[:-2].astype('int')
+    # print(df['time'])
+    df['time'] = (df['date'] - 19900000) * 10000 + df['time'].str.replace(':', '').str[:-2].astype('int')
     df = df[['date', 'time', 'open', 'high', 'low', 'close', 'vol', 'turnover', 'open_interest']]
 
     BUFFER = WTSBarStruct * len(df)
     buffer = BUFFER()
 
+
     def assign(procession, buffer):
         tuple(map(lambda x: setattr(buffer[x[0]], procession.name, x[1]), enumerate(procession)))
 
 
-
-
     df.apply(assign, buffer=buffer)
-    #print(df)
+    # print(df)
     print(buffer[s].to_dict())
 
+    newfilename = 'data/' + adjusted_list[s] + '_HOT.dsb'
 
-
-
-    newfilename='data/'+adjusted_list[s]+'_HOT.dsb'
-
-    #df.to_csv(newfilename+'.csv')
+    # df.to_csv(newfilename+'.csv')
 
     # 这里有坑，目录存在才会写入，且不能有中文名，不会报错。
     dtHelper.store_bars(barFile=newfilename, firstBar=buffer, count=len(df), period="m1")
 
     s += 1
-    #print(df)
+    # print(df)
     # if s == 1:
     #     break

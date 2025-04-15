@@ -3,6 +3,7 @@
 
 from wtpy.wrapper import WtDataHelper
 from wtpy.WtCoreDefs import WTSTickStruct
+import quantlib as ql
 import pandas as pd
 import os
 import re
@@ -15,9 +16,17 @@ exchg_name = 'CZCE'
 #exchg_name = 'CFFEX'
 #exchg_name = 'GFEX'
 # 需要转换的原文件路径
-root_directory = 'D:\\软件下载目录\\百度云\\sa'  # 替换为实际路径
+root_directory = 'D:\\软件下载目录\\百度云\\fg'  # 替换为实际路径
 # 需要转存到的路径根目录
 save_directory = 'D:\\WorkingFiels\\wtstudio\\data\\his\\ticks\\'+exchg_name
+
+pd.set_option('display.max_rows', None)  # 显示所有行
+pd.set_option('display.max_columns', None)  # 显示所有列
+pd.set_option('display.width', None)  # 调整宽度以适应所有列
+
+
+#一个数据填充规则。
+
 
 # 目录不存在则抛出提示退出
 if not os.path.exists(root_directory):
@@ -57,7 +66,6 @@ def split_alpha_numeric(s):
         return alpha_part, numeric_part
     else:
         return None, None
-
 
 csv_list = collect_csv_paths(root_directory)
 
@@ -126,8 +134,24 @@ s = 0
 for each in csv_list:
     with open(each) as f:
         encode = f.encoding
-
     df = pd.read_csv(each, encoding=encode)
+
+
+    #找到第一个且最后一个UpdateTime为20:59:00的数据，删除这行之前的所有数据。
+    #清洗
+    df=ql.QuantBox.dayAndnight(df)
+    # 用往后最近的LastPrice和AveragePric向前填充NaN
+    # 使用 bfill 方法向前填充空值
+    df['LastPrice'] = df['LastPrice'].bfill()
+    df['AveragePrice'] = df['AveragePrice'].bfill()
+    df=ql.QuantBox.plus_ms(df)
+
+    #去除8:59之前和20：59之前的多余数据。
+
+    # 检测时间列是否存在20:59，如果存在，判断为有夜盘，遍历夜盘时间段的数据，修改为上一个交易日。这里需要一个包含日期文件夹的list。
+    # 可能记录两条8:59，所以需要判断当前列时间=8:59:00且下一列数据大于9:00:00。
+    # 1. 定位第一个且最后一个时间为8:59:00的数据
+
 
     # 这里有个小坑，9.0版本以后vol会被写入为0，0，把WTSBarStruct中的volume改为vol即可，应该是版本迭代留下的坑，数据实际最终还是写入到volume字段。
     # 先重命名所有可用的现存列
@@ -148,6 +172,8 @@ for each in csv_list:
     # 不知道为啥这里要二进制形式的
     df['exchg'] = b'CZCE'  # 交易所代码
     df['code'] = csv_name[s].encode('utf-8')
+
+    #计算成交方向，线写入reserve字段。
 
     # 去掉开盘前的空值
 
