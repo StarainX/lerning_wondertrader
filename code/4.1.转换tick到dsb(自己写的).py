@@ -78,7 +78,7 @@ def split_file_path(path):
     return [part for part in parts if part]
 
 
-# 一将FG303这种'字母+数字'形式合约名称分割为字母和数字两部分。
+# 一将FG303这种'字母+数字'形式合约名称分割为字母和数字两部分的方法。
 def split_alpha_numeric(s):
     match = re.match(r"([A-Za-z]+)(\d+)", s)
     if match:
@@ -95,7 +95,7 @@ csv_list = collect_csv_paths(root_directory)
 trading_days = sorted({os.path.basename(os.path.dirname(p)) for p in csv_list})
 
 # 打印处理前的信息
-print(f"压缩档案内总共需要转换的文件数例: {len(csv_list)}")
+print(f"共需要转换的文件数例: {len(csv_list)}")
 if len(csv_list) > 0:
     print(f"开始文件: {csv_list[0]}")
     print(f"结束文件: {csv_list[-1]}")
