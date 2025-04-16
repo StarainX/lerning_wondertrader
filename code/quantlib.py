@@ -5,6 +5,7 @@ class QuantBox:
     def dayAndnight(df: pd.DataFrame, time_column: str = 'UpdateTime') -> pd.DataFrame:
         """
         清理并处理市场数据，优先处理夜盘（存在20:59:00时），若无夜盘，处理早盘（存在08:59:00时）。
+        原理是如果有开盘，开盘前一分钟一定会推送数据，因为有竞价过程。
         参数：
             df: 原始数据集（需按时间排序）
             time_column: 时间戳列的名称，默认为 'UpdateTime'
