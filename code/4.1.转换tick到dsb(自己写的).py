@@ -1,5 +1,8 @@
 #  这是一个将csv格式tick数据转换为自定义的dsb压缩格式的脚步。
 #  tick数据量大，转换生成比较耗时，所以会先判断原位置有没有文件，有则会跳过，避免重复转换。
+#  改成批量提取的了。不要批量也很简单，只要原目录下只有一个品种就行。
+#  输出目录不能有中文啊，虽然文件夹可以手动创建，但底层函数不兼容中文没招。
+
 
 from wtpy.wrapper import WtDataHelper
 from wtpy.WtCoreDefs import WTSTickStruct
@@ -8,23 +11,42 @@ import pandas as pd
 import os
 import re
 
-# 需要提前设置好交易码代码
-exchg_name = 'CZCE'
-# exchg_name = 'DCE'
-# exchg_name = 'SHFE'
-# exchg_name = 'INE'
-# exchg_name = 'CFFEX'
-# exchg_name = 'GFEX'
 # 需要转换的原文件路径
-root_directory = 'D:\\软件下载目录\\百度云\\fg'  # 替换为实际路径
+root_directory = 'D:\\软件下载目录\\百度云\\期货csv'  # 替换为实际路径
 # 需要转存到的路径根目录
-save_directory = 'D:\\WorkingFiels\\wtstudio\\data\\his\\ticks\\' + exchg_name
+save_directory = 'C:\\ticks'
 
 pd.set_option('display.max_rows', None)  # 显示所有行
 pd.set_option('display.max_columns', None)  # 显示所有列
 pd.set_option('display.width', None)  # 调整宽度以适应所有列
 
-# 一个数据填充规则。
+# 品种与交易所映射关系，严格遵循大小写，千万不要修改，因为源文件和文件名的大小写和这里具有一致性。
+EXCHANGE_MAP = {
+    "CFFEX": ["IC", "IF", "IH", "IM", "T", "TF", "TL", "TS"],
+    "CZCE": ["AP", "BR", "CF", "CJ", "CY", "FG", "JR", "LR", "MA", "OI", "PF", "PK", "PM", "PX", "RI", "RM", "RS", "SA",
+             "SF", "SH", "SM", "SR", "TA", "UR", "WH", "ZC"],
+    "DCE": ["a", "b", "bb", "c", "cs", "eb", "eg", "fb", "i", "j", "jd", "jm", "l", "lh", "m", "p", "pg", "pp", "rr",
+            "v", "y"],
+    "GFEX": ["lc", "si"],
+    "INE": ["bc", "ec", "lu", "nr", "sc"],
+    "SHFE": ["ag", "al", "ao", "au", "br", "bu", "cu", "fu", "hc", "ni", "pb", "rb", "ru", "sn", "sp", "ss", "wr", "zn"]
+}
+
+
+def find_exchange(contract: str) -> str or None:
+    """
+    根据合约代码查找所属交易所
+    :param contract: 合约代码（如"FG505"、"a2301"）
+    :return: 交易所代码（如"CZCE"、"DCE"），找不到返回None
+    """
+    # 提取合约的字母部分（不区分大小写）
+    alpha_part = ''.join(filter(str.isalpha, contract))
+
+    # 遍历交易所查找匹配
+    for exchg, codes in EXCHANGE_MAP.items():
+        if alpha_part in codes:
+            return exchg
+    return None
 
 
 # 目录不存在则抛出提示退出
@@ -78,7 +100,7 @@ if len(csv_list) > 0:
     print(f"开始文件: {csv_list[0]}")
     print(f"结束文件: {csv_list[-1]}")
 
-# 使用列表推导式过滤需要保留的条目
+# 构建需要处理的文件列表，剔除已存在的文件。
 # 这里原先在遍历时候直接从原列表remove，导致索引错位。正常做法是构建新列表，不能直接在循环中对原列表进行修改。
 filtered_list = []
 for each in csv_list:
@@ -93,14 +115,24 @@ for each in csv_list:
 
     # 分割文件名中的字母和数字
     name_part, num_part = split_alpha_numeric(base_name)
+
     if not name_part:
         name_part = "unknown"
     if not num_part:
         num_part = "000"
 
+    # 查阅合约所在交易所
+    excha = find_exchange(base_name)
+
+    if excha is None:
+        excha = "unknownexchange"
+        print('发现未知品种无法找到所属交易所：', base_name)
+        breakpoint()
+
     # 构建新路径
-    new_dir = os.path.join(save_directory, dir_last_part)
+    new_dir = os.path.join(save_directory, excha, dir_last_part)
     new_filename = f"{name_part}{num_part}.dsb"
+
     new_filepath = os.path.join(new_dir, new_filename)
 
     # print(new_filepath)
@@ -162,6 +194,8 @@ for each in csv_list:
         'Turnover': 'total_turnover',  # 总成交额
         'OpenInterest': 'open_interest',  # 持仓量
     })
+    # 当前合约所属交易所
+    exchg_name = find_exchange(csv_name[s])
 
     ## 填充一下没屌用的pre字段。需要通过当前文件名进行日期向前偏移来获取最后一条数据赋值
     # 计算当前日期
@@ -173,17 +207,21 @@ for each in csv_list:
         index = trading_days.index(current_date)
         if index > 0:
             previous_date = trading_days[index - 1]
-
-            # 获取上个交易日的收盘和持仓数据
-            df_yestraday = pd.read_csv(root_directory + '\\' + current_date + '\\' + current_contract, encoding=encode)
+            # 获取上个交易日的收盘和持仓数据写入到当前日期的昨日收盘pre_close和昨日持仓pre_interest字段。
+            df_yestraday = pd.read_csv(
+                root_directory + '\\' + exchg_name + '\\' + current_date + '\\' + current_contract, encoding=encode)
 
             df['pre_close'] = df_yestraday.iloc[-1]['LastPrice']
             df['pre_interest'] = df_yestraday.iloc[-1]['OpenInterest']
+        else:
+            # index = 0说明新合约刚上市，前一个交易没有数据，直接赋值0。
+            df['pre_close'] = df['pre_interest'] = 0
 
     # 交易所名以二进制保存
+
     df['exchg'] = bytes(f'{exchg_name}', encoding='utf-8')  # 交易所代码
     # code是合约名
-    df['code'] = csv_name[s].encode('utf-8')
+    df['code'] = bytes(csv_name[s].encode('utf-8'))
 
     # 使用diff()有个问题，就是第一个值是NaN不会被赋值。
     # 其实集合竞价也有成交量、成交额、仓差的变化，不过会在开盘前一分钟统一绘制。开盘时开始计算差额。
@@ -191,6 +229,7 @@ for each in csv_list:
     df['volume'] = df['total_volume'].diff().fillna(0)
     # 计算每tick成交额
     df['turn_over'] = df['total_turnover'].diff().fillna(0)
+    df.loc[df['turn_over'] < 0, 'turn_over'] = 0  # 负成交额统一置0。
     # 计算仓差，
     df['diff_interest'] = df['open_interest'].diff().fillna(0)
 
@@ -217,9 +256,6 @@ for each in csv_list:
 
     # 这三个字段看看能不能从akshare日k上拉一下。不过就算只拿单个合约的日线，合约还是很多，一次查询太多会被封号。
     # 解决方法是获取上一个交易日文件夹内同名合约的最后一条数据中的收盘和持仓
-    # "pre_close",
-    # "pre_settle",
-    # "pre_interest",
 
     df = df[
         ['exchg', 'code', 'price', 'open', 'high', 'low', 'total_volume', 'total_volume', 'volume', 'total_turnover',
@@ -228,8 +264,7 @@ for each in csv_list:
          'bid_qty_0',
          'ask_price_0', 'ask_qty_0']]
 
-    print(df)
-    breakpoint()
+    # print(df)
 
     BUFFER = WTSTickStruct * len(df)
     buffer = BUFFER()
@@ -240,27 +275,19 @@ for each in csv_list:
 
 
     df.apply(assign, buffer=buffer)
-    # print(df)
-    # print(buffer[s].to_dict())
-
-    # df.to_csv(newfilename+'.csv',index=False)
 
     # 整理重命名规则，类似CFFEX.IF.HOT_tick_20210104
     file_path = os.path.dirname(csv_list[s])
     file_path_elements = split_file_path(file_path)
     name, number = split_alpha_numeric(csv_name[s])
 
-    # 被坑了，别按bin目录下的格式来。tick文件放在交易所/日期/合约字母+合约名.dsb就行！
-    # newfilename = save_directory + '\\' + file_path_elements[
-    #     -1] + '\\' + exchg_name + '.' + name + '.' + number + '_tick_' + file_path_elements[-1] + '.dsb'
-
-    newfilename = save_directory + '\\' + file_path_elements[
-        -1] + '\\' + name + number + '.dsb'
+    # 保存为根目录/交易所名/日期/合约名.dsb的形式
+    newfilename = save_directory + '\\' + exchg_name + '\\' + current_date + '\\' + name + number + '.dsb'
 
     # df.to_csv(newfilename+'.csv',index=False)
 
     # 判断目录是否存在，不存在则创建
-    write_dir = save_directory + '\\' + file_path_elements[-1]
+    write_dir = save_directory + '\\' + exchg_name + '\\' + current_date
     if not os.path.exists(write_dir):
         # 如果目录不存在，则创建目录
         os.makedirs(write_dir)
